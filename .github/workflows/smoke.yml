@@ -1,0 +1,34 @@
+name: smoke
+
+# 앱 화면 코드가 바뀌었을 때만 실제 브라우저(Chromium)로 사용 흐름 전체를 확인한다.
+# (매일 올라오는 강의 파일만 바뀔 때는 돌지 않는다.)
+on:
+  push:
+    paths:
+      - 'js/**'
+      - 'css/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'manifest.webmanifest'
+      - 'tests/smoke.spec.mjs'
+      - '.github/workflows/smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Playwright 설치
+        run: |
+          npm install --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+      - name: 스모크 테스트 (폰 390×844, 노트북 1280×800)
+        run: node tests/smoke.spec.mjs

@@ -1,0 +1,39 @@
+name: validate
+
+# 강의·커리큘럼·사전·앱 코드가 바뀌면 검증기와 단위 테스트를 돌린다.
+on:
+  push:
+    paths:
+      - 'lessons/**'
+      - 'curriculum/**'
+      - 'glossary/**'
+      - 'js/**'
+      - 'css/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'vendor/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'manifest.webmanifest'
+      - '.github/workflows/validate.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 강의 JSON 전체 검증
+        run: node tools/validate.mjs --all
+      - name: 서비스 워커 버전 확인
+        run: node tools/sw-version.mjs --check
+      - name: 단위 테스트
+        run: node --test tests/*.test.mjs

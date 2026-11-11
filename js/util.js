@@ -308,8 +308,11 @@ export function toast(message, opts = {}) {
   const root = document.getElementById('toast-root');
   if (!root) return null;
   const { action, onAction, duration = action ? 8000 : 2600 } = opts;
+  // 알림이 쌓여 화면을 가리지 않도록 오래된 것부터 지워 최대 2개만 남긴다.
+  const existing = [...root.querySelectorAll('.toast:not(.leaving)')];
+  for (const old of existing.slice(0, Math.max(0, existing.length - 1))) old.remove();
   const node = document.createElement('div');
-  node.className = 'toast';
+  node.className = action ? 'toast has-action' : 'toast';
   node.setAttribute('role', 'status');
   const text = document.createElement('span');
   text.textContent = message;

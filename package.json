@@ -11,6 +11,8 @@
     "validate": "node tools/validate.mjs --all",
     "test": "node --test tests/*.test.mjs",
     "smoke": "node tests/smoke.spec.mjs",
+    "sw": "node tools/sw-version.mjs",
+    "check": "node tools/validate.mjs --all && node tools/sw-version.mjs --check && node --test tests/*.test.mjs",
     "index": "node tools/build-index.mjs"
   }
 }

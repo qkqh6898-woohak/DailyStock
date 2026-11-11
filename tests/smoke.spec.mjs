@@ -3,6 +3,7 @@
 //
 //   node tests/smoke.spec.mjs                     (Playwright 가 설치돼 있어야 한다)
 //   SMOKE_SHOTS=/tmp/shots node tests/smoke.spec.mjs   화면 사진도 저장
+//   SMOKE_CHANNEL=chrome node tests/smoke.spec.mjs     설치된 Google Chrome 으로 실행(CI)
 //
 // 두 화면 크기(폰 390×844, 노트북 1280×800)에서 차례로:
 //   강의 → 용어 카드(관련 용어·뒤로) → ⭐ 저장 → 출처 카드 → 퀴즈 → 복습(FSRS) → 일지 작성(XSS 문자열)
@@ -342,7 +343,9 @@ async function run(browser, base, size, tag) {
 }
 
 const server = await startServer({ port: 0 });
-const browser = await chromium.launch();
+const channel = process.env.SMOKE_CHANNEL || undefined;
+const browser = await chromium.launch(channel ? { channel } : {});
+console.log(`브라우저: ${channel ?? 'Playwright Chromium'} ${browser.version()}`);
 let ok = true;
 for (const [size, tag] of [[{ width: 390, height: 844 }, 'phone'], [{ width: 1280, height: 800 }, 'laptop']]) {
   try {

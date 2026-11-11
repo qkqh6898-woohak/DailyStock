@@ -22,13 +22,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
+      # 러너에 이미 설치된 Google Chrome 을 쓴다(시스템 패키지를 내려받지 않아 빠르고 덜 깨진다).
       - name: Playwright 설치
-        run: |
-          npm install --no-save playwright@1.49.1
-          npx playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm install --no-save playwright@1.63.0
       - name: 스모크 테스트 (폰 390×844, 노트북 1280×800)
-        run: node tests/smoke.spec.mjs
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "러너의 Chrome 사용: $(google-chrome --version)"
+            export SMOKE_CHANNEL=chrome
+          else
+            echo "러너에 Chrome 이 없어 Playwright Chromium 을 내려받습니다"
+            npx playwright install --with-deps chromium
+          fi
+          node tests/smoke.spec.mjs

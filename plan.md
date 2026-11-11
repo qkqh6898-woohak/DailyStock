@@ -329,7 +329,7 @@ DailyStock/
 
 ### 5.9 백업 형식
 ```json
-{ "app": "DailyDailyStock", "backup_version": 1, "exported_at": "...",
+{ "app": "DailyStockStudy", "backup_version": 1, "exported_at": "...",
   "terms": [...], "reviewLogs": [...], "quizResults": [...], "progress": [...],
   "journal": [...], "settings": [...] }
 ```

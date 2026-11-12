@@ -135,6 +135,8 @@ prompts/daily-task.md                     예약 작업 지시문
 
 - **배포**: GitHub 저장소 Settings → Pages → Branch `main` / `(root)` → Save. 1~2분 뒤 앱 주소가 열립니다.
 - **예약 작업**: [prompts/daily-task.md](prompts/daily-task.md) 내용을 Claude 예약 작업(평일 19:43 KST)에 넣고, `{{받는 사람}}` 자리에 본인 메일 주소를 적습니다. 메일 주소는 저장소에 커밋하지 않습니다.
+  - 예약 작업 설정에 **저장소 `qkqh6898-woohak/DailyStock`** 과 **Gmail 연결**을 꼭 붙입니다. 예약 작업 세션에서는 저장소를 스스로 붙일 수 없어서, 빠지면 강의를 main 에 올리지 못합니다.
+  - 2026-11-30 전에는 실행돼도 건너뜁니다. 설정을 바꾼 뒤에는 "테스트 실행"이라는 안내를 붙여 한 번 돌려 확인합니다.
 - **GitHub Actions**: 강의·앱 코드가 바뀌면 `validate`(검증 + 단위 테스트)가, 앱 화면 코드가 바뀌면 `smoke`(브라우저 테스트)가 자동으로 돕니다.
 
 ## 라이선스

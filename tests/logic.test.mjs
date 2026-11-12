@@ -235,7 +235,7 @@ test('용어 뜻 고르기 문제', () => {
 });
 
 test('주간 퀴즈: 그 주 용어 + 틀린 문제 다시 풀기 + 계산 2문제, 같은 주는 같은 문제', () => {
-  const week = lessons.filter((l) => l.date >= '2026-11-09' && l.date <= '2026-11-15');
+  const week = [perLesson];      // 저장소에 정식 강의가 늘어나도 흔들리지 않도록 샘플 강의만 쓴다
   const results = new Map([[resultKey('2026-11-11', 0), { correct: false, wrongCount: 1 }]]);
   const input = { weekId: '2026-11-09', lessons: week, results, glossaryTerms: lessons.flatMap((l) => l.terms) };
   const qs = buildWeeklyQuiz(input);

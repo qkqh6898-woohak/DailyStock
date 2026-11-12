@@ -8,6 +8,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import os from 'node:os';
+import { mkdtemp, mkdir, cp, writeFile, rm } from 'node:fs/promises';
 import { ROOT, loadLessons, readJson } from '../tools/common.mjs';
 import {
   validateLesson, validateCurriculum, validateGlossary, validateAll, validateFile,
@@ -219,14 +221,77 @@ test('용어 병합: 새 용어만 추가하고, 있던 용어는 그대로 둔�
   assert.equal(updated.glossary.terms.find((t) => t.id === 'per').first_lesson, 5, '처음 나온 강의는 유지');
 });
 
-test('다음 강의 번호: 샘플은 세지 않으므로 첫 정식 강의는 1강', async () => {
-  const info = await nextLesson({ root: ROOT, date: '2026-11-30' });
-  assert.equal(info.lesson_no, 1);
-  assert.equal(info.track, 'T1');
-  assert.equal(info.weekday, '월');
-  assert.equal(info.path, 'lessons/2026/11/2026-11-30.json');
-  assert.equal(info.already_exists, false);
-  const sampleDay = await nextLesson({ root: ROOT, date: '2026-11-11' });
-  assert.equal(sampleDay.already_exists, true);
-  assert.equal(sampleDay.existing_is_sample, true);
+/** 임시 폴더에 커리큘럼·사전·샘플 강의만 복사한 가짜 저장소를 만든다(실제 강의가 늘어나도 테스트가 흔들리지 않게). */
+async function makeFixtureRepo() {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ss-fixture-'));
+  await cp(path.join(ROOT, 'curriculum'), path.join(root, 'curriculum'), { recursive: true });
+  await cp(path.join(ROOT, 'glossary'), path.join(root, 'glossary'), { recursive: true });
+  for (const { rel, lesson } of lessons) {
+    if (lesson.sample !== true) continue;
+    await mkdir(path.dirname(path.join(root, rel)), { recursive: true });
+    await cp(path.join(ROOT, rel), path.join(root, rel));
+  }
+  return root;
+}
+
+async function addRealLesson(root, date, lessonNo) {
+  const rel = `lessons/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}.json`;
+  await mkdir(path.dirname(path.join(root, rel)), { recursive: true });
+  await writeFile(path.join(root, rel), JSON.stringify({ schema: 1, date, lesson_no: lessonNo, title: `강의 ${lessonNo}` }));
+}
+
+test('다음 강의 번호: 샘플은 세지 않고, 정식 강의가 생기면 그다음 번호, 68강 다음은 2회차', async () => {
+  const root = await makeFixtureRepo();
+  try {
+    const first = await nextLesson({ root, date: '2026-11-30' });
+    assert.equal(first.lesson_no, 1, '샘플만 있으면 첫 정식 강의는 1강');
+    assert.equal(first.track, 'T1');
+    assert.equal(first.weekday, '월');
+    assert.equal(first.path, 'lessons/2026/11/2026-11-30.json');
+    assert.equal(first.already_exists, false);
+    assert.equal(first.previous, null);
+
+    const sampleDay = await nextLesson({ root, date: '2026-11-11' });
+    assert.equal(sampleDay.already_exists, true);
+    assert.equal(sampleDay.existing_is_sample, true, '샘플이 있는 날짜는 덮어써도 된다');
+
+    await addRealLesson(root, '2026-11-30', 1);
+    const sameDay = await nextLesson({ root, date: '2026-11-30' });
+    assert.equal(sameDay.already_exists, true);
+    assert.equal(sameDay.existing_is_sample, false, '정식 강의가 이미 있으면 새로 만들지 않는다');
+    const second = await nextLesson({ root, date: '2026-12-01' });
+    assert.equal(second.lesson_no, 2, '정식 1강 다음은 2강');
+    assert.equal(second.previous.lesson_no, 1);
+    assert.equal(second.track, 'T1');
+
+    await addRealLesson(root, '2027-03-05', 68);
+    const round2 = await nextLesson({ root, date: '2027-03-08' });
+    assert.equal(round2.lesson_no, 69);
+    assert.equal(round2.round, 2);
+    assert.equal(round2.curriculum_no, 1, '2회차는 1강 주제부터 다시');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('정식 강의가 저장소에 추가돼도 전체 검증·목록 일관성이 유지된다', async () => {
+  const root = await makeFixtureRepo();
+  try {
+    // 샘플 1강을 정식 강의(11/30)로 옮겨 넣고 목록·사전을 갱신한 상태를 흉내 낸다.
+    const sample = lessons.find((x) => x.lesson.lesson_no === 1 && x.lesson.sample === true).lesson;
+    const real = { ...structuredClone(sample), date: '2026-11-30' };
+    delete real.sample;
+    for (const f of real.facts) if (f.asof > real.date) f.asof = real.date;
+    if (real.news_case?.date) real.news_case.date = '2026-11-30';
+    await mkdir(path.join(root, 'lessons/2026/11'), { recursive: true });
+    await writeFile(path.join(root, 'lessons/2026/11/2026-11-30.json'), JSON.stringify(real));
+    const { buildIndex } = await import('../tools/build-index.mjs');
+    await buildIndex({ root });
+    const { ok, reports } = await validateAll({ root });
+    assert.equal(ok, true, reports.filter((r) => r.errors.length).map((r) => `${r.file}: ${r.errors.join(' / ')}`).join('\n'));
+    const next = await nextLesson({ root, date: '2026-12-01' });
+    assert.equal(next.lesson_no, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

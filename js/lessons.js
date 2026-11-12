@@ -21,7 +21,18 @@ let glossaryMem = null;
 let curriculumMem = null;
 const revalidated = new Set();
 
+/** boot.js 가 미리 요청해 둔 응답이 있으면 한 번만 이어받는다(같은 주소를 두 번 받지 않게). */
+function takeEarly(url) {
+  const early = typeof window !== 'undefined' ? window.__ssEarly : null;
+  if (!early || !early[url]) return null;
+  const p = early[url];
+  delete early[url];
+  return p;
+}
+
 async function fetchJson(url) {
+  const early = takeEarly(url);
+  if (early) return early;
   const res = await fetch(url, { cache: 'no-cache' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
@@ -124,6 +135,33 @@ export async function loadLesson(date) {
   } catch {
     return null;
   }
+}
+
+/**
+ * 최근 강의를 미리 받아 기기에 저장한다. 열어 보지 않은 강의도 오프라인(지하철·비행기)에서 볼 수 있게 한다.
+ * 오프라인이거나 데이터 절약 모드면 건너뛴다. 이미 저장된 강의는 다시 받지 않는다.
+ * @returns {Promise<number>} 새로 저장한 강의 수
+ */
+export async function prefetchRecent(limit = 7) {
+  if (typeof navigator !== 'undefined') {
+    if (navigator.onLine === false) return 0;
+    if (navigator.connection && navigator.connection.saveData) return 0;
+  }
+  const index = await loadIndex();
+  if (index.error || index.offline) return 0;
+  const have = await cachedLessonDates();
+  let saved = 0;
+  for (const it of index.items.slice(0, limit)) {
+    if (have.has(it.date)) continue;
+    try {
+      await fetchLesson(it.date);
+      revalidated.add(it.date);
+      saved += 1;
+    } catch {
+      /* 다음에 다시 시도한다 */
+    }
+  }
+  return saved;
 }
 
 /** 기기에 사본이 있는 강의 날짜 목록(오프라인 표시용). */

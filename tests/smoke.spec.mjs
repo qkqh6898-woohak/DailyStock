@@ -118,9 +118,23 @@ async function run(browser, base, size, tag) {
   page.on('dialog', async (d) => { errors.push(`예상하지 못한 대화상자: ${d.message()}`); await d.dismiss(); });
 
   try {
-    await step('강의 화면이 열린다', async () => {
+    await step('강의 화면이 열린다(boot.js 가 미리 받은 응답을 이어받아 같은 파일을 두 번 받지 않는다)', async () => {
+      const counts = new Map();
+      const onRequest = (req) => {
+        const url = req.url().replace(base, '');
+        if (/^(lessons|glossary|curriculum)\//.test(url)) counts.set(url, (counts.get(url) ?? 0) + 1);
+      };
+      page.on('request', onRequest);
       await page.goto(`${base}#/lesson/${LESSON_DATE}`);
       await page.locator('.lesson-title').waitFor();
+      await page.waitForTimeout(300);
+      page.off('request', onRequest);
+      const lessonUrl = `lessons/${LESSON_DATE.slice(0, 4)}/${LESSON_DATE.slice(5, 7)}/${LESSON_DATE}.json`;
+      for (const url of ['lessons/index.json', 'glossary/terms.json', 'curriculum/curriculum.json', lessonUrl]) {
+        check((counts.get(url) ?? 0) === 1, `${url} 를 ${counts.get(url) ?? 0}번 받았습니다(1번이어야 함)`);
+      }
+      const leftovers = await page.evaluate(() => Object.keys(window.__ssEarly ?? {}));
+      check(leftovers.length === 0, `이어받지 않은 미리 받기: ${leftovers.join(', ')}`);
       check((await page.locator('.lesson-title').innerText()).includes('PER'), '강의 제목이 다릅니다');
       check(await page.locator('.disclaimer').first().isVisible(), '교육용 고지가 보이지 않습니다');
       await noHorizontalScroll(page, '강의');
@@ -302,10 +316,21 @@ async function run(browser, base, size, tag) {
       await page.waitForTimeout(150);
     });
 
-    await step('비행기 모드(오프라인)에서도 열어 본 강의·용어장·일지·계산기·복습이 동작한다', async () => {
+    await step('비행기 모드(오프라인)에서도 강의(안 열어 본 최근 강의 포함)·용어장·일지·계산기·복습이 동작한다', async () => {
       await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
       await page.reload();
       await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 10000 });
+      // 화면이 뜬 뒤 한가할 때 최근 강의를 미리 받아 둔다 — 강의 3개가 모두 기기에 저장될 때까지 기다린다.
+      await page.waitForFunction(() => new Promise((resolve) => {
+        const req = indexedDB.open('stockstudy');
+        req.onerror = () => resolve(false);
+        req.onsuccess = () => {
+          const dbh = req.result;
+          const c = dbh.transaction('lessonCache').objectStore('lessonCache').count();
+          c.onsuccess = () => { resolve(c.result >= 3); dbh.close(); };
+          c.onerror = () => { resolve(false); dbh.close(); };
+        };
+      }), null, { timeout: 15000, polling: 300 });
       await context.setOffline(true);
       offline = true;
       try {
@@ -314,6 +339,8 @@ async function run(browser, base, size, tag) {
         await page.locator('.lesson-body .term[data-term="per"]').first().click();
         await page.locator('#sheet-root .term-title').waitFor();
         await page.keyboard.press('Escape');
+        await go(page, '#/lesson/2026-11-03');            // 한 번도 열지 않은 강의(미리 받기로 저장됨)
+        await page.locator('.lesson-title', { hasText: '손익계산서' }).waitFor({ timeout: 10000 });
         for (const [hash, sel] of [['#/glossary', '.list .row'], ['#/journal', '.journal-list .row'], ['#/calc/compound', 'svg.chart'], ['#/review', '.stat'], ['#/curriculum', '.track-card']]) {
           await go(page, hash);
           await page.locator(sel).first().waitFor({ timeout: 5000 });
@@ -325,6 +352,39 @@ async function run(browser, base, size, tag) {
         offline = false;
       }
     });
+
+    if (size.width < 500) {
+      await step('터치 영역: 누를 수 있는 것은 모두 48px 이상(문장 속 용어·ⓘ 는 예외 기준)', async () => {
+        const problems = [];
+        for (const hash of [`#/lesson/${LESSON_DATE}`, '#/review', '#/glossary', '#/journal', '#/journal/new', '#/calc/valuation', '#/settings', '#/curriculum', '#/archive']) {
+          await go(page, hash);
+          if (hash === '#/review' && await page.locator('[data-act="reveal"]').count()) await page.locator('[data-act="reveal"]').click();
+          const found = await page.evaluate(() => {
+            const out = [];
+            const sel = 'button, a[href], input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):not([type="hidden"]), select, textarea, summary, label.btn';
+            for (const el of document.querySelectorAll(sel)) {
+              if (el.closest('.skip-link, [hidden]')) continue;
+              const r = el.getBoundingClientRect();
+              if (r.width === 0 || r.height === 0) continue;
+              const after = getComputedStyle(el, '::after');
+              let h = r.height;
+              let w = r.width;
+              if (after.content !== 'none' && after.position === 'absolute') {
+                const px = (v) => (v.endsWith('px') ? Math.max(0, -parseFloat(v)) : 0);
+                h += px(after.top) + px(after.bottom);
+                w += px(after.left) + px(after.right);
+              }
+              const inline = el.matches('.term, .fact-info') || (el.tagName === 'A' && el.closest('p') && getComputedStyle(el).display === 'inline');
+              const need = inline ? (el.matches('.fact-info') ? 40 : 0) : 48;
+              if (h + 0.5 < need || w + 0.5 < need) out.push(`${el.tagName.toLowerCase()}.${[...el.classList].join('.')} "${(el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 14)}" ${Math.round(w)}×${Math.round(h)}`);
+            }
+            return out;
+          });
+          problems.push(...found.map((f) => `${hash} ${f}`));
+        }
+        check(problems.length === 0, `48px 보다 작은 터치 영역:\n    ${problems.slice(0, 12).join('\n    ')}`);
+      });
+    }
 
     await step('모든 화면이 가로로 넘치지 않는다', async () => {
       for (const hash of ['#/today', '#/review', '#/glossary', '#/curriculum', '#/archive', '#/journal', '#/journal/new', '#/calc/valuation', '#/calc/dividend', '#/calc/avgcost', '#/settings', '#/quiz/wrong', '#/quiz/weekly']) {

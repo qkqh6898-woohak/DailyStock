@@ -17,6 +17,7 @@ import * as calcView from './calc.js';
 import * as archiveView from './archive.js';
 import * as settingsView from './settings.js';
 import { reviewCounts } from './terms.js';
+import { prefetchRecent } from './lessons.js';
 import { applyAppearance } from './settings.js';
 import './install.js';
 
@@ -44,6 +45,16 @@ const ROUTES = [
 let navToken = 0;
 let cleanup = null;
 let firstRoute = true;
+let prefetchScheduled = false;
+
+/** 첫 화면이 뜬 뒤 한가할 때 최근 강의를 미리 받아 둔다(오프라인 대비). */
+function schedulePrefetch() {
+  if (prefetchScheduled) return;
+  prefetchScheduled = true;
+  const run = () => { prefetchRecent(7).catch(() => {}); };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 5000 });
+  else setTimeout(run, 3000);
+}
 
 function parseHash() {
   const raw = location.hash.replace(/^#/, '') || '/today';
@@ -95,6 +106,7 @@ async function route() {
     cleanup = typeof result === 'function' ? result : null;
     if (!firstRoute) view.focus({ preventScroll: true });
     firstRoute = false;
+    schedulePrefetch();
   } catch (err) {
     console.error(err);
     if (mine !== navToken) return;
@@ -186,6 +198,7 @@ async function init() {
     document.addEventListener(name, updateBadges);
   }
   window.addEventListener('offline', () => toast('오프라인이에요. 저장된 내용으로 계속 볼 수 있어요.'));
+  window.addEventListener('online', () => { prefetchRecent(7).catch(() => {}); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) updateBadges(); });
 
   if (!location.hash || location.hash === '#') location.replace('#/today');

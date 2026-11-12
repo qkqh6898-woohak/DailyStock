@@ -7,7 +7,7 @@
 // (빠뜨리면 tests/sw.test.mjs 가 실패한다.) BUILD 가 바뀌면 앱이 "새 버전이 있어요"를 띄운다.
 // 모든 경로는 상대 경로다 — GitHub Pages 의 /DailyStock/ 아래에서 그대로 동작한다.
 
-const BUILD = '62b419ddd53c';
+const BUILD = '68ee637fc7bc';
 const SHELL_CACHE = `ss-shell-v1-${BUILD}`;
 const DATA_CACHE = 'ss-data-v1';
 

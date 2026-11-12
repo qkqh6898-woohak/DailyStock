@@ -171,7 +171,7 @@ h3 { font-size: 1rem; line-height: 1.45; }
 /* ───────────── 버튼·칩·배지 ───────────── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: var(--tap); padding: 0 16px; border-radius: 12px; border: 1px solid transparent;
+  min-height: var(--tap); min-width: var(--tap); padding: 0 16px; border-radius: 12px; border: 1px solid transparent;
   font-size: .95rem; font-weight: 600; text-decoration: none; white-space: nowrap; background: none;
 }
 .btn.primary { background: var(--primary); color: var(--primary-ink); }

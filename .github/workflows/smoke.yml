@@ -1,0 +1,43 @@
+name: smoke
+
+# 앱 화면 코드가 바뀌었을 때만 실제 브라우저(Chromium)로 사용 흐름 전체를 확인한다.
+# (매일 올라오는 강의 파일만 바뀔 때는 돌지 않는다.)
+on:
+  push:
+    paths:
+      - 'js/**'
+      - 'css/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'manifest.webmanifest'
+      - 'tests/smoke.spec.mjs'
+      - '.github/workflows/smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      # 러너에 이미 설치된 Google Chrome 을 쓴다(시스템 패키지를 내려받지 않아 빠르고 덜 깨진다).
+      - name: Playwright 설치
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm install --no-save playwright@1.63.0
+      - name: 스모크 테스트 (폰 390×844, 노트북 1280×800)
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "러너의 Chrome 사용: $(google-chrome --version)"
+            export SMOKE_CHANNEL=chrome
+          else
+            echo "러너에 Chrome 이 없어 Playwright Chromium 을 내려받습니다"
+            npx playwright install --with-deps chromium
+          fi
+          node tests/smoke.spec.mjs

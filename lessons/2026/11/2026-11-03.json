@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "date": "2026-11-03",
+  "lesson_no": 9,
+  "track": "T2",
+  "sample": true,
+  "title": "손익계산서 — 매출에서 순이익까지 내려 읽기",
+  "summary": [
+    "손익계산서는 매출에서 비용을 차례로 빼 순이익까지 내려가는 표다.",
+    "영업이익은 본업의 실력, 순이익은 주주에게 남는 최종 몫이다.",
+    "LG에너지솔루션은 3분기 영업이익이 {{f:1}} 흑자였지만 순이익은 {{f:5}} 적자였다."
+  ],
+  "body": [
+    "[[income-statement]]는 회사가 일정 기간 동안 얼마를 벌고, 얼마를 쓰고, 얼마를 남겼는지 적은 표다. 읽는 법은 단순하다. 맨 위의 [[revenue|매출]]에서 시작해 비용을 하나씩 빼며 아래로 내려가면 맨 아래에 [[net-income|순이익]]이 남는다. 월급 명세서와 닮았다. 세전 월급에서 세금과 보험료를 빼면 통장에 찍히는 돈이 나오는 것과 같은 구조다.",
+    "내려가는 길에는 정거장이 몇 개 있다. 매출에서 물건을 만드는 데 든 원가와 판매·관리에 쓴 비용을 빼면 [[operating-profit]]이 나온다. 본업으로 번 돈이라 회사의 장사 실력을 보여 준다. 여기에 이자, 환율, 자산 가치 변동처럼 본업 밖에서 생긴 [[non-operating]]을 더하거나 빼고, 마지막으로 법인세를 내면 순이익이 된다.",
+    "오늘 실적 설명회를 연 LG에너지솔루션이 이 구조를 잘 보여 준다. 3분기 매출은 {{f:0}}으로 분기 기준 가장 많았고, 영업이익은 {{f:1}}이었다. 매출 가운데 영업이익이 차지하는 비율인 [[operating-margin]]은 {{f:2}}다. 여기까지만 보면 장사를 잘한 분기다.",
+    "그런데 표를 끝까지 내려가면 결과가 달라진다. 본업 밖에서 {{f:3}}의 손실이 생겼기 때문이다. 영업이익에서 이 손실을 빼면 세금을 내기도 전에 이미 {{f:4}} 적자이고, 최종 성적인 순이익은 {{f:5}} 손실로 끝났다. 영업이익은 흑자인데 순이익은 적자인 분기였던 셈이다.",
+    "그래서 실적 뉴스를 볼 때는 한 줄만 보고 판단하면 안 된다. 영업이익은 본업의 체력을, 순이익은 주주에게 최종적으로 남는 몫을 말해 준다. 둘이 크게 다르면 그 사이에서 무슨 일이 있었는지, 이번 한 번으로 끝날 일인지 계속될 일인지를 확인해야 한다. 십 년을 보는 투자자라면 한 분기의 숫자보다 매출과 영업이익이 여러 해에 걸쳐 어떤 방향으로 움직이는지를 먼저 본다."
+  ],
+  "formula": {
+    "text": "매출 − 매출원가 − 판매비와 관리비 = 영업이익  →  영업이익 ± 영업외손익 − 법인세 = 순이익",
+    "terms": ["revenue", "operating-profit", "non-operating", "net-income"]
+  },
+  "news_case": {
+    "kind": "news",
+    "date": "2026-11-03",
+    "headline": "LG에너지솔루션 3분기 실적: 영업이익은 흑자, 순이익은 적자",
+    "explain": [
+      "LG에너지솔루션은 11월 3일 실적 설명회에서 3분기 실적을 설명했다. 에너지저장장치(ESS)와 전기차 배터리 출하가 함께 늘어 매출이 분기 기준으로 가장 많았다.",
+      "회사 설명에 따르면 순이익이 적자가 된 까닭은 외화 채권과 연결된 파생상품의 평가손실, 이자 비용, 소형 배터리 사업의 자산 가치 하락(손상차손) 같은 본업 밖의 손실이었다.",
+      "배터리 업계에서 따로 챙겨 볼 숫자도 있다. 영업이익에는 미국에서 배터리를 생산해 받는 보조금(세액공제) {{f:6}}이 들어 있다. 이를 빼고 계산한 영업이익은 {{f:7}}이다. 보조금 없이도 본업이 흑자였다는 뜻이지만, 제도가 바뀌면 이익도 달라질 수 있다는 점을 함께 읽어야 한다."
+    ],
+    "sources": [
+      { "name": "ZDNet Korea — LG엔솔, 3분기 매출 역대 최대", "url": "https://zdnet.co.kr/view/?no=20261103101720" },
+      { "name": "서울타임즈뉴스 — 3분기 영업익 7560억원…순손실 2969억원", "url": "https://www.seoultimes.news/news/article.html?no=2000101709" },
+      { "name": "Investing.com — 영업이익 예상치 상회에도 순손실 전환", "url": "https://kr.investing.com/news/earnings/article-2155209" },
+      { "name": "SBS Biz — LG엔솔, 3분기 보조금 빼도 흑자", "url": "https://biz.sbs.co.kr/amp/article/20000343840" }
+    ]
+  },
+  "facts": [
+    { "id": 0, "label": "LG에너지솔루션 3분기 매출", "value": 9643400000000, "unit": "원", "asof": "2026-09-30",
+      "source_url": "https://zdnet.co.kr/view/?no=20261103101720" },
+    { "id": 1, "label": "LG에너지솔루션 3분기 영업이익", "value": 756000000000, "unit": "원", "asof": "2026-09-30",
+      "source_url": "https://zdnet.co.kr/view/?no=20261103092936" },
+    { "id": 2, "label": "LG에너지솔루션 3분기 영업이익률", "value": 7.84, "unit": "%", "asof": "2026-09-30",
+      "source_url": "https://zdnet.co.kr/view/?no=20261103101720", "derived": "f1 / f0 * 100" },
+    { "id": 3, "label": "LG에너지솔루션 3분기 영업외 손실", "value": 987200000000, "unit": "원", "asof": "2026-09-30",
+      "source_url": "https://kr.investing.com/news/earnings/article-2155209" },
+    { "id": 4, "label": "LG에너지솔루션 3분기 세전 손실(법인세 차감 전)", "value": 231200000000, "unit": "원", "asof": "2026-09-30",
+      "source_url": "https://kr.investing.com/news/earnings/article-2155209", "derived": "f3 - f1" },
+    { "id": 5, "label": "LG에너지솔루션 3분기 당기순손실", "value": 296900000000, "unit": "원", "asof": "2026-09-30",
+      "source_url": "https://www.seoultimes.news/news/article.html?no=2000101709" },
+    { "id": 6, "label": "3분기 영업이익에 포함된 북미 생산 보조금(세액공제)", "value": 416900000000, "unit": "원", "asof": "2026-09-30",
+      "source_url": "https://zdnet.co.kr/view/?no=20261103101720" },
+    { "id": 7, "label": "보조금을 뺀 3분기 영업이익", "value": 339100000000, "unit": "원", "asof": "2026-09-30",
+      "source_url": "https://biz.sbs.co.kr/amp/article/20000343840", "derived": "f1 - f6" }
+  ],
+  "english": [
+    { "en": "Revenue hit a record high, but the company still posted a net loss for the quarter.",
+      "ko": "매출은 사상 최대였지만, 회사는 그 분기에 순손실을 냈다." },
+    { "en": "Operating profit came in at 756 billion won, well above the previous quarter.",
+      "ko": "영업이익은 7,560억 원으로 전 분기를 크게 웃돌았다." }
+  ],
+  "terms": [
+    { "id": "income-statement", "ko": "손익계산서", "en": "income statement",
+      "short": "일정 기간 얼마를 벌고 쓰고 남겼는지 보여 주는 표",
+      "long": "매출에서 시작해 비용을 차례로 빼 내려가며 맨 아래에 순이익을 적는다. 그래서 순이익을 영어로 '바텀 라인(bottom line)'이라고도 부른다. 보통 석 달(분기)이나 일 년 단위로 만든다.",
+      "formula": "매출 − 비용 = 이익",
+      "related": ["revenue", "operating-profit", "net-income"] },
+    { "id": "revenue", "ko": "매출(매출액)", "en": "revenue (sales)",
+      "short": "물건이나 서비스를 팔아 번 돈의 총액",
+      "long": "비용을 하나도 빼지 않은 금액이다. 손익계산서 맨 위에 있어 '톱 라인(top line)'이라고도 한다. 매출이 늘어도 비용이 더 많이 늘면 이익은 줄 수 있다.",
+      "example": "1만 원짜리 물건 100개를 팔면 매출 100만 원",
+      "related": ["income-statement", "operating-profit"] },
+    { "id": "operating-profit", "ko": "영업이익", "en": "operating profit (operating income)",
+      "short": "본업으로 벌어들인 이익",
+      "long": "매출에서 매출원가와 판매비·관리비를 뺀 값이다. 이자나 환율 같은 본업 밖의 요인이 빠져 있어 회사의 '장사 실력'을 볼 때 가장 먼저 확인한다.",
+      "formula": "매출 − 매출원가 − 판매비와 관리비",
+      "example": "매출 1,000억, 원가 700억, 판관비 200억 → 영업이익 100억",
+      "related": ["revenue", "operating-margin", "net-income"] },
+    { "id": "operating-margin", "ko": "영업이익률", "en": "operating margin",
+      "short": "매출 가운데 영업이익이 차지하는 비율",
+      "long": "100원어치를 팔아 본업으로 몇 원을 남겼는지를 뜻한다. 업종마다 보통 수준이 달라 같은 업종끼리 비교한다.",
+      "formula": "영업이익 ÷ 매출 × 100",
+      "example": "매출 1,000억, 영업이익 100억 → 10%",
+      "related": ["operating-profit", "revenue"] },
+    { "id": "non-operating", "ko": "영업외손익", "en": "non-operating income and expenses",
+      "short": "본업 밖에서 생긴 수익과 비용",
+      "long": "이자 비용, 환율 변동으로 생긴 손익, 파생상품 평가손익, 자산 가치 하락을 반영한 손상차손 등이 여기에 들어간다. 영업이익이 흑자여도 이 항목의 손실이 크면 순이익은 적자가 될 수 있다.",
+      "related": ["operating-profit", "net-income"] },
+    { "id": "net-income", "ko": "순이익(당기순이익)", "en": "net income (net profit)",
+      "short": "모든 비용과 세금을 뺀 뒤 마지막에 남은 이익",
+      "long": "영업이익에 영업외손익을 더하고 법인세를 뺀 값이다. 주주의 몫이 되는 최종 이익이며, 0보다 작으면 순손실이라고 한다.",
+      "formula": "영업이익 ± 영업외손익 − 법인세",
+      "related": ["operating-profit", "non-operating", "income-statement"] }
+  ],
+  "quiz": [
+    { "type": "concept",
+      "q": "손익계산서에서 '본업으로 번 이익'을 뜻하는 항목은?",
+      "choices": ["매출", "영업이익", "영업외손익", "순이익"],
+      "answer": 1,
+      "explain": "영업이익은 매출에서 매출원가와 판매비·관리비를 뺀 값으로, 본업의 실력을 보여 준다. 순이익은 여기에 영업외손익과 법인세까지 반영한 최종 이익이다." },
+    { "type": "calc",
+      "q": "어느 회사의 매출이 2,000억 원, 매출원가가 1,400억 원, 판매비와 관리비가 450억 원이다. 영업이익은?",
+      "choices": ["150억 원", "550억 원", "600억 원", "1,850억 원"],
+      "answer": 0,
+      "calc": { "vars": { "revenue": 2000, "cogs": 1400, "sga": 450 }, "expr": "revenue - cogs - sga",
+                "template": "어느 회사의 매출이 {revenue}억 원, 매출원가가 {cogs}억 원, 판매비와 관리비가 {sga}억 원이다. 영업이익은?",
+                "unit": "억 원", "digits": 0 },
+      "explain": "2,000 − 1,400 − 450 = 150억 원. 매출에서 원가와 판관비를 빼면 영업이익이다." },
+    { "type": "case",
+      "q": "오늘 사례에서 LG에너지솔루션의 영업이익은 흑자인데 순이익이 적자가 된 가장 큰 이유는?",
+      "choices": [
+        "매출이 전 분기보다 줄어서",
+        "본업 밖에서 생긴 영업외 손실이 영업이익보다 커서",
+        "매출원가가 매출보다 많아서",
+        "배당금을 많이 지급해서"
+      ],
+      "answer": 1,
+      "explain": "영업이익 {{f:1}}보다 영업외 손실 {{f:3}}이 더 컸다. 그래서 세금을 내기 전에 이미 적자가 됐다. 배당은 순이익이 정해진 뒤에 나누는 것이라 손익계산서의 비용이 아니다." }
+  ],
+  "disclaimer": true
+}

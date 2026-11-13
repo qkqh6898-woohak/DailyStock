@@ -20,6 +20,21 @@ test('서비스 워커: 셸 목록이 빠짐없고 BUILD 값이 최신이다', a
   assert.ok(list.every((p) => !p.startsWith('/') && !p.includes('://')), '모든 경로는 상대 경로여야 한다(GitHub Pages 하위 경로)');
 });
 
+test('자동 업데이트: 새 서비스 워커가 바로 넘겨받고, 앱은 누를 것 없이 화면 이동 때 새 버전을 연다', async () => {
+  const sw = await read('sw.js');
+  const install = sw.slice(sw.indexOf("addEventListener('install'"), sw.indexOf("addEventListener('activate'"));
+  assert.match(install, /self\.skipWaiting\(\)/, '설치가 끝나면 기다리지 않고 넘겨받아야 한다');
+  assert.match(sw, /GET_VERSION/, '설정 화면이 버전을 물을 수 있어야 한다');
+  assert.match(sw, /clients\.claim\(\)/);
+
+  const update = await read('js/update.js');
+  assert.match(update, /controllerchange/);
+  assert.match(update, /registration\.update\(\)/, '앱으로 돌아올 때 직접 새 버전을 확인해야 한다(홈 화면 앱은 오래 켜 둔다)');
+  const main = await read('js/main.js');
+  assert.match(main, /isUpdatePending\(\)\) applyUpdate\(\)/, '화면을 옮길 때 기다리던 새 버전을 적용해야 한다');
+  assert.doesNotMatch(main + update, /새 버전이 있어요/, '사용자에게 [새로고침]을 누르라고 하지 않는다');
+});
+
 test('매니페스트: 설치 조건(이름·아이콘 192/512·standalone·상대 경로)', async () => {
   const m = JSON.parse(await read('manifest.webmanifest'));
   assert.equal(m.name, 'Daily Stock Study');

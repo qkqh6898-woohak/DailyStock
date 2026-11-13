@@ -5,7 +5,7 @@
 //   node tools/sw-version.mjs --check  갱신이 필요하면 실패(테스트·CI 용)
 //
 // BUILD = 셸 파일들의 SHA-256 앞 12자리. 셸 파일이 하나라도 바뀌면 값이 달라져
-// 브라우저가 새 서비스 워커를 설치하고 앱이 "새 버전이 있어요"를 띄운다.
+// 브라우저가 새 서비스 워커를 설치하고, 앱이 다음 화면 이동 때 새 버전으로 바꾼다(js/update.js).
 
 import { createHash } from 'node:crypto';
 import { readFile, readdir, writeFile } from 'node:fs/promises';

@@ -4,10 +4,12 @@
 //   강의·목록·사전·커리큘럼(JSON)       네트워크 우선 → 실패하면 저장본
 //
 // 셸 파일을 고치면 `node tools/sw-version.mjs` 를 실행해 BUILD 값을 갱신한다.
-// (빠뜨리면 tests/sw.test.mjs 가 실패한다.) BUILD 가 바뀌면 앱이 "새 버전이 있어요"를 띄운다.
+// (빠뜨리면 tests/app.test.mjs 가 실패한다.) BUILD 가 바뀌면 브라우저가 새 서비스 워커를 설치하고,
+// 새 서비스 워커는 기다리지 않고 바로 넘겨받는다. 열려 있는 화면은 앱(js/update.js)이
+// 다음 화면 이동 때 새로고침해 새 버전으로 바꾼다 — 사용자가 따로 누를 것은 없다.
 // 모든 경로는 상대 경로다 — GitHub Pages 의 /DailyStock/ 아래에서 그대로 동작한다.
 
-const BUILD = '68ee637fc7bc';
+const BUILD = '95d75b608dfc';
 const SHELL_CACHE = `ss-shell-v1-${BUILD}`;
 const DATA_CACHE = 'ss-data-v1';
 
@@ -39,6 +41,7 @@ const SHELL = [
   'js/srs.js',
   'js/terms.js',
   'js/tts.js',
+  'js/update.js',
   'js/util.js',
   'vendor/ts-fsrs.umd.js',
   'icons/icon.svg',
@@ -65,6 +68,8 @@ self.addEventListener('install', (event) => {
     } catch {
       // 데이터는 앱을 열 때 다시 받으므로 여기서 실패해도 괜찮다.
     }
+    // 새 버전은 기다리지 않고 바로 넘겨받는다(자동 업데이트).
+    await self.skipWaiting();
   })());
 });
 
@@ -77,7 +82,9 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  const type = event.data && event.data.type;
+  if (type === 'SKIP_WAITING') self.skipWaiting();             // 예전 버전의 앱이 보내는 신호
+  else if (type === 'GET_VERSION' && event.ports[0]) event.ports[0].postMessage({ build: BUILD });
 });
 
 /** 서비스 워커 범위 안의 상대 경로. 범위 밖이면 null. */

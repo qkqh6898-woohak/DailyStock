@@ -7,6 +7,15 @@ import * as tts from './tts.js';
 import { confirmDialog } from './popup.js';
 import { BACKUP_STORES, backupFileName, buildBackup, mergeBackup, parseBackup } from './backup.js';
 import { canInstall, isStandalone, onInstallChange, platform, promptInstall } from './install.js';
+import { checkForUpdate, currentBuild } from './update.js';
+
+const UPDATE_MESSAGES = {
+  found: '새 버전을 받는 중이에요. 곧 새로고침됩니다.',
+  latest: '최신 버전이에요.',
+  offline: '오프라인이에요. 인터넷에 연결되면 다시 확인해 주세요.',
+  unsupported: '이 브라우저에서는 자동 업데이트를 쓸 수 없어요. 새로고침하면 최신 버전이 열려요.',
+  error: '확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+};
 
 export const APP_VERSION = '1.0.0';
 export const REPO_URL = 'https://github.com/qkqh6898-woohak/DailyStock';
@@ -306,7 +315,11 @@ export async function render(page, params = {}, query = {}) {
     <section class="card" aria-labelledby="h-about">
       <h2 id="h-about">ℹ️ 앱 정보</h2>
       <dl class="kv">
-        <dt>버전</dt><dd class="num">${APP_VERSION}</dd>
+        <dt>버전</dt><dd class="num">${APP_VERSION} · <span data-role="build">확인 중</span></dd>
+        <dt>업데이트</dt><dd>
+          <span data-role="update-status" role="status">새 버전은 자동으로 적용돼요. 다른 화면으로 옮길 때 바뀌어요.</span>
+          <button type="button" class="btn ghost small" data-act="check-update">지금 확인</button>
+        </dd>
         <dt>저장소</dt><dd><a href="${REPO_URL}" target="_blank" rel="noopener noreferrer">GitHub ↗</a></dd>
         <dt>강의</dt><dd>평일 저녁 8시경 새 강의가 올라와요.</dd>
         <dt>개인 정보</dt><dd>용어장·복습·일지는 이 기기의 브라우저 저장소에만 있고, 서버로 보내지 않아요.</dd>
@@ -451,7 +464,35 @@ export async function render(page, params = {}, query = {}) {
       const outcome = await promptInstall();
       if (outcome === 'accepted') toast('홈 화면에 설치했어요');
       drawInstall();
+    } else if (act === 'check-update') {
+      const button = e.target.closest('[data-act]');
+      const status = page.querySelector('[data-role="update-status"]');
+      button.disabled = true;
+      status.textContent = '확인하는 중…';
+      let result;
+      try {
+        result = await checkForUpdate({ now: true });
+      } catch {
+        result = 'error';
+      }
+      if (!page.isConnected) return;
+      status.textContent = UPDATE_MESSAGES[result] ?? UPDATE_MESSAGES.error;
+      if (result !== 'found') {
+        button.disabled = false;
+      } else {
+        // 새 버전이 넘겨받으면 update.js 가 새로고침한다. 한참 지나도 그대로면 다시 누를 수 있게 한다.
+        setTimeout(() => {
+          if (!page.isConnected) return;
+          status.textContent = UPDATE_MESSAGES.error;
+          button.disabled = false;
+        }, 30000);
+      }
     }
+  });
+
+  currentBuild().then((build) => {
+    const slot = page.querySelector('[data-role="build"]');
+    if (slot) slot.textContent = build ? build.slice(0, 7) : '-';
   });
 
   if (query.s === 'data') {

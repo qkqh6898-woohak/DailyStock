@@ -8,6 +8,7 @@
 
 import http from 'node:http';
 import path from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { readFile, stat } from 'node:fs/promises';
 import { ROOT, isMain } from './common.mjs';
 
@@ -24,6 +25,9 @@ const TYPES = {
   '.md': 'text/markdown; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
 };
+
+const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.webmanifest', '.svg', '.md', '.txt']);
+const gzCache = new Map();
 
 /**
  * 정적 서버를 띄운다.
@@ -49,12 +53,22 @@ export function startServer({ port = 8080, root = ROOT, host = '127.0.0.1' } = {
         res.end();
         return;
       }
-      const body = await readFile(file);
-      res.writeHead(200, {
-        'Content-Type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream',
-        'Content-Length': body.length,
+      const ext = path.extname(file).toLowerCase();
+      let body = await readFile(file);
+      const headers = {
+        'Content-Type': TYPES[ext] ?? 'application/octet-stream',
         'Cache-Control': 'no-cache',
-      });
+        Vary: 'Accept-Encoding',
+      };
+      // GitHub Pages 처럼 글자 파일은 gzip 으로 압축해 보낸다(실제 배포와 비슷한 속도로 확인).
+      if (COMPRESSIBLE.has(ext) && /\bgzip\b/.test(req.headers['accept-encoding'] ?? '')) {
+        const key = `${file}:${info.mtimeMs}`;
+        if (!gzCache.has(key)) gzCache.set(key, gzipSync(body));
+        body = gzCache.get(key);
+        headers['Content-Encoding'] = 'gzip';
+      }
+      headers['Content-Length'] = body.length;
+      res.writeHead(200, headers);
       res.end(req.method === 'HEAD' ? undefined : body);
     } catch {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });

@@ -4,6 +4,7 @@
   "description": "매일 저녁 주식 개념 1강을 실제 뉴스 사례와 함께 배우는 개인용 주식 공부 앱 (교육용, 투자 권유 아님)",
   "lang": "ko",
   "dir": "ltr",
+  "id": "./",
   "start_url": "./#/today",
   "scope": "./",
   "display": "standalone",

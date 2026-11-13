@@ -5,7 +5,7 @@
 //          #/journal  #/journal/new  #/journal/edit/:id  #/journal/:id
 //          #/calc  #/calc/compound  #/settings
 
-import { html, setHtml, toast } from './util.js';
+import { html, kstDate, setHtml, toast } from './util.js';
 import * as db from './db.js';
 import * as lessonView from './lesson.js';
 import * as reviewView from './review.js';
@@ -17,7 +17,9 @@ import * as calcView from './calc.js';
 import * as archiveView from './archive.js';
 import * as settingsView from './settings.js';
 import { reviewCounts } from './terms.js';
+import { invalidateIndex, prefetchRecent, resolveToday } from './lessons.js';
 import { applyAppearance } from './settings.js';
+import { announceUpdate, applyUpdate, isUpdatePending, registerServiceWorker } from './update.js';
 import './install.js';
 
 const DATE = '(\\d{4}-\\d{2}-\\d{2})';
@@ -44,6 +46,19 @@ const ROUTES = [
 let navToken = 0;
 let cleanup = null;
 let firstRoute = true;
+let prefetchScheduled = false;
+let todayKey = null;     // 오늘 화면에 띄운 강의 — 앱으로 돌아왔을 때 새 강의가 생겼는지 비교한다
+let hiddenAt = 0;
+const RESUME_REFRESH_MS = 60 * 1000;
+
+/** 첫 화면이 뜬 뒤 한가할 때 최근 강의를 미리 받아 둔다(오프라인 대비). */
+function schedulePrefetch() {
+  if (prefetchScheduled) return;
+  prefetchScheduled = true;
+  const run = () => { prefetchRecent(7).catch(() => {}); };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 5000 });
+  else setTimeout(run, 3000);
+}
 
 function parseHash() {
   const raw = location.hash.replace(/^#/, '') || '/today';
@@ -95,6 +110,9 @@ async function route() {
     cleanup = typeof result === 'function' ? result : null;
     if (!firstRoute) view.focus({ preventScroll: true });
     firstRoute = false;
+    schedulePrefetch();
+    todayKey = null;
+    if (path === '/today') todayKeyNow().then((key) => { if (mine === navToken) todayKey = key; }).catch(() => {});
   } catch (err) {
     console.error(err);
     if (mine !== navToken) return;
@@ -131,45 +149,37 @@ function setBadge(tab, n) {
   link.setAttribute('aria-label', n > 0 ? `${base} (${n}개)` : base);
 }
 
-/* ───────────────────────── 서비스 워커 ───────────────────────── */
+/* ───────────────────────── 화면 이동 · 앱으로 돌아오기 ───────────────────────── */
 
-function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  if (new URLSearchParams(location.search).has('nosw')) return;
-  const hadController = Boolean(navigator.serviceWorker.controller);
-  let updateShown = false;
-  let reloading = false;
+/** 화면 이동. 새 버전이 넘겨받아 기다리는 중이면 이때 새로고침해 새 버전으로 연다(update.js). */
+function onHashChange() {
+  if (isUpdatePending()) applyUpdate();
+  else route();
+}
 
-  const offerUpdate = (apply) => {
-    if (updateShown) return;
-    updateShown = true;
-    toast('새 버전이 있어요', { action: '새로고침', duration: 0, onAction: apply });
-  };
+/** 오늘 화면이 무엇을 보여 줘야 하는지(날짜·강의). 바뀌었으면 다시 그린다. */
+async function todayKeyNow() {
+  const { kind, item } = await resolveToday();
+  return `${kstDate()}|${kind}|${item?.date ?? ''}`;
+}
 
-  navigator.serviceWorker.register('./sw.js').then((reg) => {
-    const watch = (worker) => {
-      if (!worker) return;
-      worker.addEventListener('statechange', () => {
-        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-          offerUpdate(() => worker.postMessage({ type: 'SKIP_WAITING' }));
-        }
-      });
-    };
-    if (reg.waiting && navigator.serviceWorker.controller) {
-      offerUpdate(() => reg.waiting.postMessage({ type: 'SKIP_WAITING' }));
-    }
-    watch(reg.installing);
-    reg.addEventListener('updatefound', () => watch(reg.installing));
-  }).catch((err) => console.warn('서비스 워커 등록 실패', err));
+/** 오늘 화면을 켜 둔 채 나갔다가 돌아왔을 때 새 강의가 올라왔거나 날짜가 바뀌었으면 새로 그린다. */
+async function refreshTodayIfChanged() {
+  if (!todayKey || parseHash().path !== '/today') return;
+  invalidateIndex();
+  const key = await todayKeyNow();
+  if (key === todayKey || parseHash().path !== '/today') return;
+  if (isUpdatePending()) applyUpdate();
+  else route();
+}
 
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hadController || reloading) return;    // 첫 설치 때는 새로고침하지 않는다
-    reloading = true;
-    location.reload();
-  });
-  navigator.serviceWorker.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'SHELL_UPDATED') offerUpdate(() => location.reload());
-  });
+function onVisibilityChange() {
+  if (document.hidden) {
+    hiddenAt = Date.now();
+    return;
+  }
+  updateBadges();
+  if (hiddenAt && Date.now() - hiddenAt >= RESUME_REFRESH_MS) refreshTodayIfChanged().catch(() => {});
 }
 
 /* ───────────────────────── 시작 ───────────────────────── */
@@ -181,16 +191,18 @@ async function init() {
   if (!settings.firstUseAt) await db.setSetting('firstUseAt', new Date().toISOString());
   db.requestPersist();
 
-  window.addEventListener('hashchange', route);
+  window.addEventListener('hashchange', onHashChange);
   for (const name of ['ss:terms-changed', 'ss:journal-changed', 'ss:review-changed']) {
     document.addEventListener(name, updateBadges);
   }
   window.addEventListener('offline', () => toast('오프라인이에요. 저장된 내용으로 계속 볼 수 있어요.'));
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) updateBadges(); });
+  window.addEventListener('online', () => { prefetchRecent(7).catch(() => {}); });
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   if (!location.hash || location.hash === '#') location.replace('#/today');
   else route();
   registerServiceWorker();
+  announceUpdate();
 }
 
 init().catch((err) => {

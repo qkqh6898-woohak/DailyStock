@@ -21,7 +21,32 @@
   <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="css/app.css">
-  <script src="js/theme-init.js"></script>
+  <script src="js/boot.js"></script>
+  <!-- 앱 코드를 한 번에 나란히 내려받는다(차례로 불러오느라 첫 화면이 늦어지는 것을 막음) -->
+  <link rel="modulepreload" href="js/main.js">
+  <link rel="modulepreload" href="js/util.js">
+  <link rel="modulepreload" href="js/db.js">
+  <link rel="modulepreload" href="js/lessons.js">
+  <link rel="modulepreload" href="js/render.js">
+  <link rel="modulepreload" href="js/lesson.js">
+  <link rel="modulepreload" href="js/popup.js">
+  <link rel="modulepreload" href="js/terms.js">
+  <link rel="modulepreload" href="js/srs.js">
+  <link rel="modulepreload" href="js/tts.js">
+  <link rel="modulepreload" href="js/progress.js">
+  <link rel="modulepreload" href="js/journal.js">
+  <link rel="modulepreload" href="js/install.js">
+  <link rel="modulepreload" href="js/update.js">
+  <link rel="modulepreload" href="js/review.js">
+  <link rel="modulepreload" href="js/glossary.js">
+  <link rel="modulepreload" href="js/quiz.js">
+  <link rel="modulepreload" href="js/expr.js">
+  <link rel="modulepreload" href="js/curriculum.js">
+  <link rel="modulepreload" href="js/calc.js">
+  <link rel="modulepreload" href="js/archive.js">
+  <link rel="modulepreload" href="js/settings.js">
+  <link rel="modulepreload" href="js/backup.js">
+  <link rel="modulepreload" href="vendor/ts-fsrs.umd.js">
 </head>
 <body>
   <a class="skip-link" href="#view">본문으로 건너뛰기</a>

@@ -8,11 +8,13 @@
 // 두 화면 크기(폰 390×844, 노트북 1280×800)에서 차례로:
 //   강의 → 용어 카드(관련 용어·뒤로) → ⭐ 저장 → 출처 카드 → 퀴즈 → 복습(FSRS) → 일지 작성(XSS 문자열)
 //   → 회고 대기 표시 → 회고 → 계산기 → 백업 내보내기 → 전체 삭제 → 가져오기 → 오프라인 → 가로 넘침 검사
+// 마지막으로 앱 사본을 고쳐 가며 자동 업데이트(새 강의 반영 · 새 버전 적용 · 설정의 [지금 확인])를 확인한다.
 
 import { createRequire } from 'node:module';
-import { mkdtemp, readFile, mkdir } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { ROOT } from '../tools/common.mjs';
 import { startServer } from '../tools/serve.mjs';
 
 const require = createRequire(import.meta.url);
@@ -118,9 +120,23 @@ async function run(browser, base, size, tag) {
   page.on('dialog', async (d) => { errors.push(`예상하지 못한 대화상자: ${d.message()}`); await d.dismiss(); });
 
   try {
-    await step('강의 화면이 열린다', async () => {
+    await step('강의 화면이 열린다(boot.js 가 미리 받은 응답을 이어받아 같은 파일을 두 번 받지 않는다)', async () => {
+      const counts = new Map();
+      const onRequest = (req) => {
+        const url = req.url().replace(base, '');
+        if (/^(lessons|glossary|curriculum)\//.test(url)) counts.set(url, (counts.get(url) ?? 0) + 1);
+      };
+      page.on('request', onRequest);
       await page.goto(`${base}#/lesson/${LESSON_DATE}`);
       await page.locator('.lesson-title').waitFor();
+      await page.waitForTimeout(300);
+      page.off('request', onRequest);
+      const lessonUrl = `lessons/${LESSON_DATE.slice(0, 4)}/${LESSON_DATE.slice(5, 7)}/${LESSON_DATE}.json`;
+      for (const url of ['lessons/index.json', 'glossary/terms.json', 'curriculum/curriculum.json', lessonUrl]) {
+        check((counts.get(url) ?? 0) === 1, `${url} 를 ${counts.get(url) ?? 0}번 받았습니다(1번이어야 함)`);
+      }
+      const leftovers = await page.evaluate(() => Object.keys(window.__ssEarly ?? {}));
+      check(leftovers.length === 0, `이어받지 않은 미리 받기: ${leftovers.join(', ')}`);
       check((await page.locator('.lesson-title').innerText()).includes('PER'), '강의 제목이 다릅니다');
       check(await page.locator('.disclaimer').first().isVisible(), '교육용 고지가 보이지 않습니다');
       await noHorizontalScroll(page, '강의');
@@ -302,10 +318,21 @@ async function run(browser, base, size, tag) {
       await page.waitForTimeout(150);
     });
 
-    await step('비행기 모드(오프라인)에서도 열어 본 강의·용어장·일지·계산기·복습이 동작한다', async () => {
+    await step('비행기 모드(오프라인)에서도 강의(안 열어 본 최근 강의 포함)·용어장·일지·계산기·복습이 동작한다', async () => {
       await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
       await page.reload();
       await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 10000 });
+      // 화면이 뜬 뒤 한가할 때 최근 강의를 미리 받아 둔다 — 강의 3개가 모두 기기에 저장될 때까지 기다린다.
+      await page.waitForFunction(() => new Promise((resolve) => {
+        const req = indexedDB.open('stockstudy');
+        req.onerror = () => resolve(false);
+        req.onsuccess = () => {
+          const dbh = req.result;
+          const c = dbh.transaction('lessonCache').objectStore('lessonCache').count();
+          c.onsuccess = () => { resolve(c.result >= 3); dbh.close(); };
+          c.onerror = () => { resolve(false); dbh.close(); };
+        };
+      }), null, { timeout: 15000, polling: 300 });
       await context.setOffline(true);
       offline = true;
       try {
@@ -314,6 +341,8 @@ async function run(browser, base, size, tag) {
         await page.locator('.lesson-body .term[data-term="per"]').first().click();
         await page.locator('#sheet-root .term-title').waitFor();
         await page.keyboard.press('Escape');
+        await go(page, '#/lesson/2026-11-03');            // 한 번도 열지 않은 강의(미리 받기로 저장됨)
+        await page.locator('.lesson-title', { hasText: '손익계산서' }).waitFor({ timeout: 10000 });
         for (const [hash, sel] of [['#/glossary', '.list .row'], ['#/journal', '.journal-list .row'], ['#/calc/compound', 'svg.chart'], ['#/review', '.stat'], ['#/curriculum', '.track-card']]) {
           await go(page, hash);
           await page.locator(sel).first().waitFor({ timeout: 5000 });
@@ -325,6 +354,39 @@ async function run(browser, base, size, tag) {
         offline = false;
       }
     });
+
+    if (size.width < 500) {
+      await step('터치 영역: 누를 수 있는 것은 모두 48px 이상(문장 속 용어·ⓘ 는 예외 기준)', async () => {
+        const problems = [];
+        for (const hash of [`#/lesson/${LESSON_DATE}`, '#/review', '#/glossary', '#/journal', '#/journal/new', '#/calc/valuation', '#/settings', '#/curriculum', '#/archive']) {
+          await go(page, hash);
+          if (hash === '#/review' && await page.locator('[data-act="reveal"]').count()) await page.locator('[data-act="reveal"]').click();
+          const found = await page.evaluate(() => {
+            const out = [];
+            const sel = 'button, a[href], input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):not([type="hidden"]), select, textarea, summary, label.btn';
+            for (const el of document.querySelectorAll(sel)) {
+              if (el.closest('.skip-link, [hidden]')) continue;
+              const r = el.getBoundingClientRect();
+              if (r.width === 0 || r.height === 0) continue;
+              const after = getComputedStyle(el, '::after');
+              let h = r.height;
+              let w = r.width;
+              if (after.content !== 'none' && after.position === 'absolute') {
+                const px = (v) => (v.endsWith('px') ? Math.max(0, -parseFloat(v)) : 0);
+                h += px(after.top) + px(after.bottom);
+                w += px(after.left) + px(after.right);
+              }
+              const inline = el.matches('.term, .fact-info') || (el.tagName === 'A' && el.closest('p') && getComputedStyle(el).display === 'inline');
+              const need = inline ? (el.matches('.fact-info') ? 40 : 0) : 48;
+              if (h + 0.5 < need || w + 0.5 < need) out.push(`${el.tagName.toLowerCase()}.${[...el.classList].join('.')} "${(el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 14)}" ${Math.round(w)}×${Math.round(h)}`);
+            }
+            return out;
+          });
+          problems.push(...found.map((f) => `${hash} ${f}`));
+        }
+        check(problems.length === 0, `48px 보다 작은 터치 영역:\n    ${problems.slice(0, 12).join('\n    ')}`);
+      });
+    }
 
     await step('모든 화면이 가로로 넘치지 않는다', async () => {
       for (const hash of ['#/today', '#/review', '#/glossary', '#/curriculum', '#/archive', '#/journal', '#/journal/new', '#/calc/valuation', '#/calc/dividend', '#/calc/avgcost', '#/settings', '#/quiz/wrong', '#/quiz/weekly']) {
@@ -342,6 +404,117 @@ async function run(browser, base, size, tag) {
   }
 }
 
+/**
+ * 자동 업데이트(폰 화면). 앱 사본을 고쳐 가며 "새 강의가 올라옴"·"새 버전 배포"를 흉내 낸다.
+ *   - 처음 열 때는 업데이트로 치지 않는다
+ *   - 오늘 화면을 켜 둔 채 나갔다 돌아오면 그사이 올라온 강의로 바뀐다
+ *   - 새 버전을 배포하면 보던 화면은 그대로, 다른 화면으로 옮길 때 새 버전으로 바뀐다(누를 것 없음)
+ *   - 설정 › [지금 확인]: 최신이면 알려 주고, 새 버전이 있으면 바로 바꾼다
+ */
+async function runUpdate(browser) {
+  console.log('\n▶ 자동 업데이트 (390×844, 앱 사본으로 배포를 흉내 냄)');
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ss-update-'));
+  await cp(ROOT, root, { recursive: true, filter: (src) => !/[\\/](\.git|node_modules)([\\/]|$)/.test(src) });
+  // 저장소에 정식 강의가 쌓여도 결과가 같도록 샘플 강의만 남긴다.
+  const indexPath = path.join(root, 'lessons/index.json');
+  const index = JSON.parse(await readFile(indexPath, 'utf8'));
+  index.items = index.items.filter((it) => it.sample === true);
+  await writeFile(indexPath, JSON.stringify(index, null, 2));
+
+  const server = await startServer({ port: 0, root });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+  const page = await context.newPage();
+  page.setDefaultTimeout(Number(process.env.SMOKE_TIMEOUT) || 15000);
+  currentPage = page;
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+  page.on('dialog', async (d) => { errors.push(`예상하지 못한 대화상자: ${d.message()}`); await d.dismiss(); });
+
+  const swPath = path.join(root, 'sw.js');
+  const deploy = async (build) => {
+    const text = await readFile(swPath, 'utf8');
+    await writeFile(swPath, text.replace(/const BUILD = '[0-9a-f]{12}';/, `const BUILD = '${build}';`));
+  };
+  const toastText = () => page.locator('#toast-root').innerText();
+
+  try {
+    await step('처음 열 때는 업데이트로 치지 않는다(새로고침·안내 없음)', async () => {
+      await page.goto(`${server.url}index.html#/today`);
+      await page.locator('.lesson-title').waitFor();
+      await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+      await page.waitForTimeout(500);
+      check(!(await page.evaluate(() => document.documentElement.dataset.update)), '처음 설치를 업데이트로 착각했습니다');
+      check(!(await toastText()).includes('업데이트'), '처음 열었는데 업데이트 안내가 떴습니다');
+    });
+
+    await step('오늘 화면을 켜 둔 채 나갔다가 돌아오면 그사이 올라온 강의로 바뀐다', async () => {
+      check((await page.locator('#view').innerText()).includes('맛보기'), '시작할 때는 샘플 강의가 보여야 합니다');
+      await page.evaluate(() => { document.querySelector('#view .page').dataset.old = '1'; });
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      // 나가 있는 동안 오늘 강의가 올라온다(샘플 강의를 오늘 날짜의 정식 강의로 복사).
+      const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+      const rel = `lessons/${today.slice(0, 4)}/${today.slice(5, 7)}/${today}.json`;
+      const lesson = JSON.parse(await readFile(path.join(root, `lessons/2026/11/${LESSON_DATE}.json`), 'utf8'));
+      Object.assign(lesson, { date: today, sample: false });
+      await mkdir(path.dirname(path.join(root, rel)), { recursive: true });
+      await writeFile(path.join(root, rel), JSON.stringify(lesson));
+      index.items.unshift({ date: today, lesson_no: lesson.lesson_no, track: lesson.track, title: lesson.title, path: rel, sample: false });
+      await writeFile(indexPath, JSON.stringify(index, null, 2));
+      // 2분 뒤 돌아온다.
+      await page.evaluate(() => {
+        const realNow = Date.now.bind(Date);
+        Date.now = () => realNow() + 2 * 60 * 1000;
+        delete document.hidden;
+        delete document.visibilityState;
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await page.waitForFunction(() => {
+        const p = document.querySelector('#view .page');
+        return p && !p.dataset.old && p.querySelector('.lesson-title');
+      });
+      check(!(await page.locator('#view').innerText()).includes('맛보기'), '돌아온 뒤에도 새 강의 대신 샘플 강의가 보입니다');
+    });
+
+    await step('새 버전을 배포하면 보던 화면은 그대로 두고, 다른 화면으로 옮길 때 새 버전으로 바뀐다', async () => {
+      await page.evaluate(() => { window.__oldPage = true; });
+      await deploy('111111111111');
+      // 앱을 열거나 앱으로 돌아올 때 하는 확인과 같다.
+      await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()));
+      await page.waitForFunction(() => document.documentElement.dataset.update === 'pending');
+      check(await page.evaluate(() => window.__oldPage === true), '보던 화면이 갑자기 새로고침됐습니다');
+      check(await page.locator('.lesson-title').isVisible(), '보던 강의가 사라졌습니다');
+      await Promise.all([page.waitForEvent('load'), page.locator('#tabbar a[data-tab="settings"]').click()]);
+      await page.locator('#toast-root').getByText('새 버전으로 업데이트했어요').waitFor();
+      check(!(await page.evaluate(() => window.__oldPage)), '새로고침되지 않았습니다');
+      check((await page.evaluate(() => location.hash)) === '#/settings', '옮기려던 화면(설정)이 아닙니다');
+      await page.waitForFunction(() => document.querySelector('[data-role="build"]')?.textContent === '1111111');
+    });
+
+    await step('설정 › [지금 확인]: 최신이면 알려 주고, 새 버전이 있으면 바로 바꾼다', async () => {
+      await page.locator('[data-act="check-update"]').click();
+      await page.locator('[data-role="update-status"]').getByText('최신 버전이에요').waitFor();
+      await deploy('222222222222');
+      await Promise.all([page.waitForEvent('load'), page.locator('[data-act="check-update"]').click()]);
+      await page.locator('#toast-root').getByText('새 버전으로 업데이트했어요').waitFor();
+      await page.waitForFunction(() => document.querySelector('[data-role="build"]')?.textContent === '2222222');
+    });
+
+    await step('브라우저 오류가 없다', async () => {
+      check(errors.length === 0, errors.join(' / '));
+    });
+  } finally {
+    if (errors.length) console.log(`  브라우저 오류:\n    ${errors.join('\n    ')}`);
+    await context.close();
+    await server.close();
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
 const server = await startServer({ port: 0 });
 const channel = process.env.SMOKE_CHANNEL || undefined;
 const browser = await chromium.launch(channel ? { channel } : {});
@@ -353,6 +526,11 @@ for (const [size, tag] of [[{ width: 390, height: 844 }, 'phone'], [{ width: 128
   } catch {
     ok = false;
   }
+}
+try {
+  await runUpdate(browser);
+} catch {
+  ok = false;
 }
 await browser.close();
 await server.close();
